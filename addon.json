@@ -5,6 +5,7 @@
 	"ignore"	:
 	[
 		"icon.*",
-		"*.gma"
+		"*.gma",
+		"README.md"
 	]
 }
