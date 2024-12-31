@@ -34,7 +34,7 @@ hook.Add("Initialize", "TF2ParticleFix", function() timer.Simple(2.5, function()
 
 hook.Add("OnEntityCreated", "TF2ShotgunFix", function (ent)
 	if (ent:IsValid()) then
-		if (string.gmatch(ent:GetClass(), "prop_.*") && ent:GetModel() == "models/weapons/w_models/w_shotgun.mdl") then
+		if (string.StartsWith(ent:GetClass(), "prop_") && ent:GetModel() == "models/weapons/w_models/w_shotgun.mdl") then
 			ent:SetMaterial("tf_replacements/weapon_shotgun")
 		end
 	end
