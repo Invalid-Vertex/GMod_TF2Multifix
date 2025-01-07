@@ -2,6 +2,10 @@
 --DO NOT PARSE ANYTHING USING NIL AS THE VAR, THIS WILL CAUSE THE FUCKY
 --For future reference, $basetexturetransform (scale) = Matrix():Scale(Vector(matrixscale[1],matrixscale[2],matrixscale[3]))
 
+--Super hidden, console unchangeable convar to tell the clients the map is made for TF2. Not archived for obvious reasons.
+local isTF2Map = CreateConVar("tf_fixthemap", "0", FCVAR_UNREGISTERED+FCVAR_PRINTABLEONLY+FCVAR_REPLICATED+16+FCVAR_NOT_CONNECTED, "Current session marked as a map to fix. Good job finding this.", 0, 1)
+local dev = GetConVar("developer")
+
 local function FixUpTexture(material, replacement, detail, detailscale, detailblendmode, detailblendfactor, matrixscale, flags)
 	--var ref = string, string, string, float, int, float, float OR vector, int
 	local matstring = material
@@ -32,25 +36,36 @@ local function FixUpTexture(material, replacement, detail, detailscale, detailbl
 		material:SetInt("$flags", material:GetInt("$flags"))
 	end
 	material:Recompute()
-	if GetConVar("developer"):GetString() == "1" then
-		print("[TF2 Multi-Fix] Fixing up material:",tostring(material),"\nReplacement:",replacement,"\nDetail [Texture, Scale, BlendMode, BlendFactor]:",detail,detailscale,detailblendmode,detailblendfactor,"\nMatrix Scale:",matrixscale,"\n$flags:",material:GetInt("$flags"),"\n---------------")
-	end
+	if dev:GetInt() >= 1 then print("[TF2 Multi-Fix] Fixing up material:",tostring(material),"\nReplacement:",replacement,"\nDetail [Texture, Scale, BlendMode, BlendFactor]:",detail,detailscale,detailblendmode,detailblendfactor,"\nMatrix Scale:",matrixscale,"\n$flags:",material:GetInt("$flags"),"\n---------------") end
 end
 
---Sound fix for maps using voice lines pre TF2s ".wav -> .mp3" change
-hook.Add("EntityKeyValue", "FixTF2Voices", function (ent, key, value)
-	for k, v in pairs(ents.FindByClass("info_player_teamspawn")) do
-		if (ent:IsValid()) then
-			if (ent:GetClass() == "ambient_generic") then
-				if (key == "message") then
-					if (string.StartWith(value, "vo/") and string.EndsWith(value, ".wav")) then
-						return string.Replace(value, ".wav", ".mp3")
-					end
-				end
-			end
+--Ambient sounds and player spawnpoints are completely handled by the server
+if SERVER then
+	--Caching the result of a single hit and stopping there is faster than running an iterator of entity list every entity spawn
+	local fixsnd = false
+	hook.Add("OnEntityCreated", "TF2MapCheck", function(ent)
+		if ent:GetClass() == "info_player_teamspawn" then
+			--Changing the convar so connected clients can have the appropriate fixes applied.
+			isTF2Map:SetBool(true)
+			fixsnd = true
+			print("[TF2 Multi-Fix] We're on a TF2 map. Getting ready to fix problems...")
+			--Dispose of the hook as we don't need it anymore. Hopefully.
+			hook.Remove("OnEntityCreated", "TF2MapCheck")
 		end
-	break end
-end)
+	end)
+
+	--Sound fix for maps using voice lines pre TF2s ".wav -> .mp3" change
+	hook.Add("EntityKeyValue", "FixTF2Voices", function (ent, key, value)
+		if !fixsnd then return end
+		if !IsValid(ent) then return end
+		if !(ent:GetClass() == "ambient_generic" and key == "message") then return end
+		if (string.StartWith(value, "vo/") and string.EndsWith(value, ".wav")) then
+			if dev:GetInt() >= 1 then print("[TF2 Multi-Fix] Converting voiceline " .. value .. " to .mp3...\n---------------") end
+			return string.Replace(value, ".wav", ".mp3")
+		end
+	end)
+end
+
 
 --Texture fixup
 local function TF2TextureFix()
@@ -121,9 +136,7 @@ local function TF2TextureFix()
 							flags = nil
 						end
 						FixUpTexture(material, mat_stripped,nil,nil,nil,nil,matscale,flags)
-						if GetConVar("developer"):GetString() == "1" then
-							print("[TF2 Multi-Fix] Fixing up cubemap:",tostring(mat_full),tostring(mat_cubemap),tostring(mat_stripped),"\n---------------")
-						end
+						if dev:GetInt() >= 1 then print("[TF2 Multi-Fix] Fixing up cubemap:",tostring(mat_full),tostring(mat_cubemap),tostring(mat_stripped),"\n---------------") end
 					end
 				end
 			end
@@ -131,5 +144,14 @@ local function TF2TextureFix()
 	end
 end
 
-hook.Add("Initialize", "TF2TextureFixup", function() timer.Simple(5.0, function() for k, v in pairs(ents.FindByClass("info_player_teamspawn")) do MsgN("[TF2 Multi-Fix] Applying texture fixups, this might chug a bit!") TF2TextureFix() game.CleanUpMap(true) break end end) end)
+--All entities have spawned, run the fix
+hook.Add("InitPostEntity", "TF2TextureFixup", function() timer.Simple(0, function()
+	if isTF2Map:GetBool() then
+		if SERVER then
+			game.CleanUpMap(true) --To fix ambient_generic but not cleaning up clientstuff
+		end
+		MsgN("[TF2 Multi-Fix] Applying texture fixups, this might chug a bit!")
+		TF2TextureFix()
+	end
+end) end)
 concommand.Add("tf_applyfixup", function() MsgN("[TF2 Multi-Fix] Manually applying TF2 fixups") TF2TextureFix() end)
