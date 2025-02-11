@@ -3,8 +3,8 @@
 --For future reference, $basetexturetransform (scale) = Matrix():Scale(Vector(matrixscale[1],matrixscale[2],matrixscale[3]))
 
 --Super hidden, console unchangeable convar to tell the clients the map is made for TF2. Not archived for obvious reasons.
-local isTF2Map = CreateConVar("tf_fixthemap", "0", FCVAR_UNREGISTERED+FCVAR_PRINTABLEONLY+FCVAR_REPLICATED+16+FCVAR_NOT_CONNECTED, "Current session marked as a map to fix. Good job finding this.", 0, 1)
-local dev = GetConVar("developer")
+local bIsTF2Map = CreateConVar("tf_fixthemap", "0", FCVAR_UNREGISTERED+FCVAR_PRINTABLEONLY+FCVAR_REPLICATED+16+FCVAR_NOT_CONNECTED, "Current session marked as a map to fix. Good job finding this.", 0, 1)
+local bDev = GetConVar("developer")
 
 local function FixUpTexture(material, replacement, detail, detailscale, detailblendmode, detailblendfactor, matrixscale, flags)
 	--var ref = string, string, string, float, int, float, float OR vector, int
@@ -36,18 +36,18 @@ local function FixUpTexture(material, replacement, detail, detailscale, detailbl
 		material:SetInt("$flags", material:GetInt("$flags"))
 	end
 	material:Recompute()
-	if dev:GetInt() >= 1 then print("[TF2 Multi-Fix] Fixing up material:",tostring(material),"\nReplacement:",replacement,"\nDetail [Texture, Scale, BlendMode, BlendFactor]:",detail,detailscale,detailblendmode,detailblendfactor,"\nMatrix Scale:",matrixscale,"\n$flags:",material:GetInt("$flags"),"\n---------------") end
+	if bDev:GetInt() >= 1 then print("[TF2 Multi-Fix] Fixing up material:",tostring(material),"\nReplacement:",replacement,"\nDetail [Texture, Scale, BlendMode, BlendFactor]:",detail,detailscale,detailblendmode,detailblendfactor,"\nMatrix Scale:",matrixscale,"\n$flags:",material:GetInt("$flags"),"\n---------------") end
 end
 
 --Ambient sounds and player spawnpoints are completely handled by the server
 if SERVER then
 	--Caching the result of a single hit and stopping there is faster than running an iterator of entity list every entity spawn
-	local fixsnd = false
+	local bFixSound = false
 	hook.Add("OnEntityCreated", "TF2MapCheck", function(ent)
 		if ent:GetClass() == "info_player_teamspawn" then
 			--Changing the convar so connected clients can have the appropriate fixes applied.
-			isTF2Map:SetBool(true)
-			fixsnd = true
+			bIsTF2Map:SetBool(true)
+			bFixSound = true
 			print("[TF2 Multi-Fix] We're on a TF2 map. Getting ready to fix problems...")
 			--Dispose of the hook as we don't need it anymore. Hopefully.
 			hook.Remove("OnEntityCreated", "TF2MapCheck")
@@ -56,11 +56,11 @@ if SERVER then
 
 	--Sound fix for maps using voice lines pre TF2s ".wav -> .mp3" change
 	hook.Add("EntityKeyValue", "FixTF2Voices", function (ent, key, value)
-		if !fixsnd then return end
+		if !bFixSound then return end
 		if !IsValid(ent) then return end
 		if !(ent:GetClass() == "ambient_generic" and key == "message") then return end
 		if (string.StartWith(value, "vo/") and string.EndsWith(value, ".wav")) then
-			if dev:GetInt() >= 1 then print("[TF2 Multi-Fix] Converting voiceline " .. value .. " to .mp3...\n---------------") end
+			if bDev:GetInt() >= 1 then print("[TF2 Multi-Fix] Converting voiceline " .. value .. " to .mp3...\n---------------") end
 			return string.Replace(value, ".wav", ".mp3")
 		end
 	end)
@@ -105,7 +105,8 @@ local function TF2TextureFix()
 	FixUpTexture("glass/glasswindow005a",nil,nil,nil,nil,nil,Vector(1,0.5,1),2097152)
 	FixUpTexture("glass/glasswindow006b","glasswindow006b",nil,nil,nil,nil,nil)
 	--Overlays
-	FixUpTexture("nature/dirtroad001a",nil,nil,nil,nil,nil,nil)
+	FixUpTexture("nature/dirtroad001a",nil,nil,nil,nil,nil,nil,2097152)
+	FixUpTexture("nature/dirtroad001b",nil,nil,nil,nil,nil,nil,2097152)
 	--Detail Sprites
 	FixUpTexture("detail/detailsprites",nil,nil,nil,nil,nil,nil)
 	
@@ -136,7 +137,7 @@ local function TF2TextureFix()
 							flags = nil
 						end
 						FixUpTexture(material, mat_stripped,nil,nil,nil,nil,matscale,flags)
-						if dev:GetInt() >= 1 then print("[TF2 Multi-Fix] Fixing up cubemap:",tostring(mat_full),tostring(mat_cubemap),tostring(mat_stripped),"\n---------------") end
+						if bDev:GetInt() >= 1 then print("[TF2 Multi-Fix] Fixing up cubemap:",tostring(mat_full),tostring(mat_cubemap),tostring(mat_stripped),"\n---------------") end
 					end
 				end
 			end
@@ -146,7 +147,7 @@ end
 
 --All entities have spawned, run the fix
 hook.Add("InitPostEntity", "TF2TextureFixup", function() timer.Simple(0, function()
-	if isTF2Map:GetBool() then
+	if bIsTF2Map:GetBool() then
 		if SERVER then
 			game.CleanUpMap(true) --To fix ambient_generic but not cleaning up clientstuff
 		end
