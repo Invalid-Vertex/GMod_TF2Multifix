@@ -146,7 +146,7 @@ local function TF2TextureFix()
 end
 
 --All entities have spawned, run the fix
-hook.Add("InitPostEntity", "TF2TextureFixup", function() timer.Simple(0, function()
+hook.Add("InitPostEntity", "TF2TextureFixup", function() timer.Simple(5.0, function()
 	if bIsTF2Map:GetBool() then
 		if SERVER then
 			game.CleanUpMap(true) --To fix ambient_generic but not cleaning up clientstuff

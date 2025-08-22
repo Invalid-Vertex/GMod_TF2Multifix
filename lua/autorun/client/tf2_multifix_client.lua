@@ -30,7 +30,7 @@ local function TF2ParticleFix()
 		MsgN("[TF2 Multi-Fix] No map specific particle manifest detected, skipping")
 	end
 end
-hook.Add("Initialize", "TF2ParticleFix", function() timer.Simple(2.5, function() TF2ParticleFix() end) end)
+hook.Add("Initialize", "TF2ParticleFix", function() timer.Simple(0.5, function() TF2ParticleFix() end) end)
 
 hook.Add("OnEntityCreated", "TF2ShotgunFix", function (ent)
 	if !IsValid(ent) then return end
